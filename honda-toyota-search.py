@@ -286,7 +286,7 @@ def save_seen_urls(filepath: Path, urls: set):
 if __name__ == "__main__":
     # Run crawler
     json_file = crawl_facebook_marketplace(
-        'Provo', 'car', 8000, 2000
+        'Provo', 'car', 10000, 1000
     )
 
     #now send a discord notification
