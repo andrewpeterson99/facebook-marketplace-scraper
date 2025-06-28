@@ -1,0 +1,6 @@
+*.env
+venv/
+__pycache__/
+json_data/
+best_deal_output/
+archive/

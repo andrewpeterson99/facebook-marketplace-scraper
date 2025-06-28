@@ -1,0 +1,18 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: Debug Script",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": {
+                "PYTHONPATH": "${workspaceFolder}",
+                "DEBUG": "1" // Example environment variable
+            },
+            "cwd": "${workspaceFolder}",
+            "pythonPath": "${workspaceFolder}/.venv/bin/python"
+        }
+    ]
+}

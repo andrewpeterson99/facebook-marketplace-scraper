@@ -1,10 +1,3 @@
-# Description: This file contains the code for Passivebot's Facebook Marketplace Scraper API.
-# Date: 2024-01-24
-# Author: Harminder Nijjar
-# Version: 1.0.0.
-# Usage: python app.py
-
-
 # Import the necessary libraries.
 # Playwright is used to crawl the Facebook Marketplace.
 from playwright.sync_api import sync_playwright
@@ -21,6 +14,14 @@ import json
 # The uvicorn library is used to run the API.
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
+#load credentials from .env file
+from decouple import config
+import re
+
+email = config('EMAIL')
+password = config('PASSWORD')
+
+
                  
 # Create an instance of the FastAPI class.
 app = FastAPI()
@@ -56,7 +57,7 @@ def root():
 @app.get("/crawl_facebook_marketplace")
 # Define a function to be executed when the endpoint is called.
 # Add a description to the function.
-def crawl_facebook_marketplace(city: str, query: str, max_price: int):
+def crawl_facebook_marketplace(city: str, query: str, max_price: int, min_price: int):
     # Define dictionary of cities from the facebook marketplace directory for United States.
     # https://m.facebook.com/marketplace/directory/US/?_se_imp=0oey5sMRMSl7wluQZ
     # TODO - Add more cities to the dictionary.
@@ -104,7 +105,9 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int):
         'Oaklahoma City' : 'oklahoma',
         'Pittsburgh': 'pittsburgh',
         'San Francisco': 'sanfrancisco',
-        'Tampa': 'tampa'
+        'Tampa': 'tampa',
+        'Salt Lake City': 'saltlakecity',
+        'Provo': 'provo',
     }
     # If the city is in the cities dictionary...
     if city in cities:
@@ -120,7 +123,7 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int):
         # TODO - Try and find a way to get city location ids from Facebook if the city is not in the cities dictionary.
         
     # Define the URL to scrape.
-    marketplace_url = f'https://www.facebook.com/marketplace/{city}/search/?query={query}&maxPrice={max_price}'
+    marketplace_url = f'https://www.facebook.com/marketplace/106066949424984/search/?query={query}&maxPrice={max_price}&minPrice={min_price}&exact=false'
     initial_url = "https://www.facebook.com/login/device-based/regular/login/"
     # Get listings of particular item in a particular city for a particular price.
     # Initialize the session using Playwright.
@@ -133,16 +136,35 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int):
         # Wait for the page to load.
         time.sleep(2)
         try:
-            email_input = page.wait_for_selector('input[name="email"]').fill('YOUR_EMAIL_HERE')
-            password_input = page.wait_for_selector('input[name="pass"]').fill('YOUR_PASSWORD_HERE')
+            email_input = page.wait_for_selector('input[name="email"]').fill(email)
+            password_input = page.wait_for_selector('input[name="pass"]').fill(password)
             time.sleep(2)
             login_button = page.wait_for_selector('button[name="login"]').click()
-            time.sleep(2)
+            time.sleep(5)
             page.goto(marketplace_url)
         except:
             page.goto(marketplace_url)
         # Wait for the page to load.
-        time.sleep(2)
+        print("waiting for page to load")
+        time.sleep(5)
+        #find an element with aria-label="Close" and click it
+        try:
+            close_button = page.wait_for_selector('div[aria-label="Close"]').click()
+            #find button "Date listed" (x1lliihq x6ikm8r x10wlt62 x1n2onr6 xlyipyv xuxw1ft is class name, then we need to click it)
+            #look for that class as well as the text "Date listed" contained in a span
+            time.sleep(1)
+            date_listed_button = page.locator('span.x1lliihq.x6ikm8r.x10wlt62.x1n2onr6.xlyipyv.xuxw1ft:has-text("Date listed")')
+            date_listed_button.click()
+            #click the "last 7 days" button
+            time.sleep(1)
+            last_7_days_button = page.wait_for_selector('span:has-text("Last 7 days")').click()
+            time.sleep(2)
+            sort_by_button = page.locator('span.x1lliihq.x6ikm8r.x10wlt62.x1n2onr6.xlyipyv.xuxw1ft:has-text("Sort by")')
+            sort_by_button.click()
+            sort_date_listed_button = page.locator('span:has-text("Date listed: Newest first")')
+            sort_date_listed_button.click()
+        except Exception as e:
+            print(e)
         # Infinite scroll to the bottom of the page until the loop breaks.
         # for _ in range(5):
         #     page.keyboard.press('End')
@@ -152,28 +174,40 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int):
         parsed = []
         listings = soup.find_all('div', class_='x9f619 x78zum5 x1r8uery xdt5ytf x1iyjqo2 xs83m0k x1e558r4 x150jy0e x1iorvi4 xjkvuk6 xnpuxes x291uyu x1uepa24')
         for listing in listings:
+            print("parsing listing")
             try:
                 # Get the item image.
-                image = listing.find('img', class_='xt7dq6l xl1xv1r x6ikm8r x10wlt62 xh8yej3')['src']
+                # image = listing.find('img', class_='xt7dq6l xl1xv1r x6ikm8r x10wlt62 xh8yej3')['src']
                 # Get the item title from span.
                 title = listing.find('span', 'x1lliihq x6ikm8r x10wlt62 x1n2onr6').text
                 # Get the item price.
                 price = listing.find('span', 'x193iq5w xeuugli x13faqbe x1vvkbs x1xmvt09 x1lliihq x1s928wv xhkezso x1gmr53x x1cpjm7i x1fgarty x1943h6x xudqn12 x676frb x1lkfr7t x1lbecb7 x1s688f xzsf02u').text
                 # Get the item URL.
-                post_url = listing.find('a', class_='x1i10hfl xjbqb8w x6umtig x1b1mbwd xaqea5y xav7gou x9f619 x1ypdohk xt0psk2 xe8uvvx xdj266r x11i5rnm xat24cr x1mh8g0r xexx8yu x4uap5 x18d9i69 xkhd6sd x16tdsg8 x1hl2dhg xggy1nq x1a2a7pz x1heor9g x1lku1pv')['href']
+                post_url = listing.find('a', class_='x1i10hfl xjbqb8w x1ejq31n xd10rxx x1sy0etr x17r0tee x972fbf xcfux6l x1qhh985 xm0m39n x9f619 x1ypdohk xt0psk2 xe8uvvx xdj266r x11i5rnm xat24cr x1mh8g0r xexx8yu x4uap5 x18d9i69 xkhd6sd x16tdsg8 x1hl2dhg xggy1nq x1a2a7pz x1heor9g xkrqix3 x1sur9pj x1s688f x1lku1pv')['href']
                 # Get the item location.
+                subtexts = listing.find_all('span', class_='x1lliihq x6ikm8r x10wlt62 x1n2onr6 xlyipyv xuxw1ft x1j85h84')
+                #miles is equal to a subtext with "miles" in it
+                miles = ""
+                for subtext in subtexts:
+                    if "miles" in subtext.text:
+                        miles = subtext.text
+                        break
+                
                 location = listing.find('span', 'x1lliihq x6ikm8r x10wlt62 x1n2onr6 xlyipyv xuxw1ft x1j85h84').text
                 # Append the parsed data to the list.
                 parsed.append({
-                    'image': image,
+                    # 'image': image,
                     'title': title,
                     'price': price,
                     'post_url': post_url,
-                    'location': location
+                    'location': location,
+                    'miles': miles
                 })
+                print("appending parsed")
             except:
                 pass
         # Close the browser.
+        print("closing browser")
         browser.close()
         # Return the parsed data as a JSON.
         result = []
@@ -183,9 +217,18 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int):
                 'price': item['price'],
                 'location': item['location'],
                 'title': item['title'],
-                'image': item['image'],
-                'link': item['post_url']
+                # 'image': item['image'],
+                'link': item['post_url'],
+                'miles': item['miles']
             })
+        # save the result to a json file named by the current date and time, and query made
+        sanitized_query = re.sub(r'[^a-zA-Z0-9_]+', '_', query)
+        filename = f'{sanitized_query}_{time.strftime("%Y-%m-%d_%H-%M-%S")}.json'
+
+        with open(filename, 'w') as f:
+            result_json = json.dumps(result, indent=4)
+            f.write(result_json)
+            
         return result
 
 # Create a route to the return_html endpoint.
