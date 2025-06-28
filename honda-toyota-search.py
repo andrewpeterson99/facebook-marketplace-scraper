@@ -206,7 +206,7 @@ def crawl_facebook_marketplace(city: str, query: str, max_price: int, min_price:
 
         for listing in listings:
             try:
-                title = listing.find('span', class_='x1lliihq').text or "No Title"
+                title = listing.find('span', class_='x1lliihq x6ikm8r x10wlt62 x1n2onr6').text or "No Title"
                 price = listing.find('span', class_='x193iq5w').text or "No Price"
                 link_tag = listing.find('a', href=True)
                 post_url = f"https://www.facebook.com{link_tag['href']}" if link_tag else "No URL"
